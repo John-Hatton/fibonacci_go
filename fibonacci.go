@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const version = "1.0.3"
+const version = "1.0.4"
 
 func Fibonacci(n int, debug bool, memo map[int]int) int {
 	// Check if the value of `n` has been already computed and saved in the map.
@@ -26,12 +26,16 @@ func Fibonacci(n int, debug bool, memo map[int]int) int {
 	a, b := 0, 1
 	for i := 2; i <= n; i++ {
 		a, b = b, a+b
+		memo[i] = b
 	}
-	memo[n] = b
 
-	// If `debug` is true, print the result with a debug message.
+	// If `debug` is true, print the sequence with a debug message.
 	if debug {
-		fmt.Printf("Fibonacci(%d) = %d\n", n, b)
+		fmt.Print("Fibonacci sequence: ")
+		for i := 0; i <= n; i++ {
+			fmt.Printf("%d\n", memo[i])
+		}
+		fmt.Println()
 	}
 
 	return b
