@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-const version = "1.0.7"
+const version = "1.1.0"
 
 var outputBuffer bytes.Buffer
 
@@ -128,6 +128,11 @@ func main() {
 		// If the user provided an input string with the "-i" flag, call the Fibonacci function with that value and debug flag.
 		result := Fibonacci(parseInput(cmdLine.InputText), cmdLine.Debug, make(map[uint64]*big.Int))
 
+		// Print no matter what, if we get input
+		fibStr := fmt.Sprintf("Fibonacci(%d) = %d\n", parseInput(cmdLine.InputText), result)
+		outputBuffer.WriteString(fibStr)
+		fmt.Printf("Fibonacci(%d) = %d\n", parseInput(cmdLine.InputText), result)
+
 		// If the user provided the "-o" flag, print the result to the console.
 		if cmdLine.Output {
 
@@ -135,11 +140,6 @@ func main() {
 				fmt.Println(err)
 				os.Exit(1)
 			}
-			//defer file.Close()
-			fibStr := fmt.Sprintf("Fibonacci(%d) = %d\n", parseInput(cmdLine.InputText), result)
-			outputBuffer.WriteString(fibStr)
-
-			fmt.Printf("Fibonacci(%d) = %d\n", parseInput(cmdLine.InputText), result)
 		}
 
 		//If the user provided the "-l" flag, save the result to the specified log file.
