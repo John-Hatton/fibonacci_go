@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"github.com/John-Hatton/cmdline_go"
 	"math/big"
@@ -10,7 +11,9 @@ import (
 	"strings"
 )
 
-const version = "1.0.6"
+const version = "1.0.7"
+
+var outputBuffer bytes.Buffer
 
 func Fibonacci(n uint64, debug bool, memo map[uint64]*big.Int) *big.Int {
 	// Check if the value of `n` has been already computed and saved in the map.
@@ -32,10 +35,16 @@ func Fibonacci(n uint64, debug bool, memo map[uint64]*big.Int) *big.Int {
 
 	// If `debug` is true, print the sequence with a debug message.
 	if debug {
-		fmt.Print("Fibonacci sequence: ")
-		for i := uint64(0); i <= n; i++ {
-			fmt.Printf("%d\n", memo[i])
+		outputBuffer.WriteString("Fibonacci sequence: \n")
+		fmt.Print("Fibonacci sequence: \n")
+		for i := uint64(2); i <= n; i++ {
+			if memo[i] != big.NewInt(1) && memo[i] != big.NewInt(0) {
+				fibStr := fmt.Sprintf("%d\n", memo[i])
+				outputBuffer.WriteString(fibStr)
+				fmt.Printf("%d\n", memo[i])
+			}
 		}
+		outputBuffer.WriteString("\n")
 		fmt.Println()
 	}
 
@@ -43,6 +52,7 @@ func Fibonacci(n uint64, debug bool, memo map[uint64]*big.Int) *big.Int {
 }
 
 func main() {
+
 	// Get command-line arguments using os.Args.
 	args := os.Args[1:]
 
@@ -50,10 +60,10 @@ func main() {
 	cmdLine := cmdline_go.CommandLine{}
 
 	// Set the help text for the command-line interface.
-	cmdLine.HelpText = "Usage: fibonacci_go [OPTIONS]\n\nOptions:\n  -d, -debug      Set DEBUG flag true\n  -v, -version    Print version number\n  -h, -help       Print this table\n  -f FILENAME     Print report about file\n  -i INPUT_STRING Process an input string\n"
+	cmdLine.HelpText = "Usage: fibonacci_go [OPTIONS]\n\nOptions:\n  -d, --debug        Set DEBUG flag true\n  -v, --version      Print version number\n  -h, --help         Print this table\n  -f FILENAME        Take a file in as input\n  -i INPUT_STRING    Process an input string\n  -o LOG_TO_CONSOLE  Log output to console\n  -l LOG_FILENAME    Save output to log file\n"
 
-	mystr := fmt.Sprintf("Fibonacci_Go -- Version: %s\nby: John Hatton", version)
-	cmdLine.VersionText = mystr
+	myVer := fmt.Sprintf("Fibonacci_Go -- Version: %s\nby: John Hatton", version)
+	cmdLine.VersionText = myVer
 
 	// Parse the command-line arguments using the Parse method of CommandLine struct.
 	err := cmdLine.Parse(args)
@@ -73,12 +83,13 @@ func main() {
 
 	// If the debug flag is set to true, print a message indicating that debug mode is enabled.
 	if cmdLine.Debug {
+		outputBuffer.WriteString("Debug mode enabled \n")
 		fmt.Println("Debug mode enabled")
 	}
 
-	// If the user provided a filename with the -f option, read the input file and call the Fibonacci function with the values read from the file.
+	// If the user provided a filename with the"-f" flag, read the input from the file and set it as the value of input variable.
+
 	if cmdLine.FileName != "" {
-		// Open the input file.
 		file, err := os.Open(cmdLine.FileName)
 		if err != nil {
 			fmt.Println(err)
@@ -86,66 +97,78 @@ func main() {
 		}
 		defer file.Close()
 
-		var n uint64
-		// Use a scanner to read the file line by line.
 		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			text := scanner.Text()
-			// Skip comment lines that start with #.
-			if strings.HasPrefix(text, "#") {
-				continue
-			}
-			// Convert the text to an integer and call the Fibonacci function with it.
-			parsedN, err := strconv.ParseUint(text, 10, 64)
-			if err != nil {
-				fmt.Printf("Error converting %s to integer: %v\n", text, err)
-				continue
-			}
-			n = parsedN
-			result := Fibonacci(n, cmdLine.Debug, make(map[uint64]*big.Int))
-			fmt.Printf("Fibonacci(%d) = %d\n", n, result)
+		scanner.Scan()
+		input := scanner.Text()
+
+		// Call the Fibonacci function with the parsed input value and debug flag.
+		result := Fibonacci(parseInput(input), cmdLine.Debug, make(map[uint64]*big.Int))
+
+		// If the user provided the "-o" flag, print the result to the console.
+		if cmdLine.LogToConsole {
+			fmt.Println(result)
 		}
 
-		if err := scanner.Err(); err != nil {
-			fmt.Fprintln(os.Stderr, "reading standard input:", err)
+		// If the user provided the "-l" flag, save the result to the specified log file.
+		if cmdLine.LogFileName != "" {
+			file, err := os.OpenFile(cmdLine.LogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			defer file.Close()
+
+			_, err = fmt.Fprintf(file, "%d\n", result)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
 		}
 	} else if cmdLine.InputText != "" {
-		// Read input text
-		// Call Fibonacci with the value read from the input text
-		lines := strings.Split(cmdLine.InputText, "\n")
-		var n uint64
-		for _, line := range lines {
-			if strings.HasPrefix(line, "#") {
-				continue
-			}
-			// Convert the text to a uint64 and call the Fibonacci function with it.
-			n, err = strconv.ParseUint(line, 10, 64)
+		// If the user provided an input string with the "-i" flag, call the Fibonacci function with that value and debug flag.
+		result := Fibonacci(parseInput(cmdLine.InputText), cmdLine.Debug, make(map[uint64]*big.Int))
+
+		// If the user provided the "-o" flag, print the result to the console.
+		if cmdLine.Output {
+
 			if err != nil {
-				fmt.Printf("Error converting %s to uint64: %v\n", line, err)
-				continue
+				fmt.Println(err)
+				os.Exit(1)
 			}
-			result := Fibonacci(n, cmdLine.Debug, make(map[uint64]*big.Int))
-			fmt.Printf("Fibonacci(%d) = %d\n", n, result)
+			//defer file.Close()
+			fibStr := fmt.Sprintf("Fibonacci(%d) = %d\n", parseInput(cmdLine.InputText), result)
+			outputBuffer.WriteString(fibStr)
+
+			fmt.Printf("Fibonacci(%d) = %d\n", parseInput(cmdLine.InputText), result)
+		}
+
+		//If the user provided the "-l" flag, save the result to the specified log file.
+		if cmdLine.LogFileName != "" {
+			file, err := os.OpenFile(cmdLine.LogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			defer file.Close()
+
+			_, err = fmt.Fprintf(file, "%s", outputBuffer.String())
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
 		}
 	} else {
-		// Read user input from the command line
-		var n uint64
-		fmt.Print("Enter a number: ")
-		_, err := fmt.Scanf("%d", &n)
-		if err != nil {
-			fmt.Println("Invalid input")
-			os.Exit(1)
-		}
-		result := Fibonacci(n, cmdLine.Debug, make(map[uint64]*big.Int))
-		fmt.Printf("Fibonacci(%d) = %d\n", n, result)
+		// If no input was provided, print the help text.
+		fmt.Println(cmdLine.HelpText)
 	}
+}
 
-	if cmdLine.Help {
-		cmdLine.PrintHelp()
-		os.Exit(0)
+// Function to parse the input value to an unsigned 64-bit integer.
+func parseInput(input string) uint64 {
+	n, err := strconv.ParseUint(strings.TrimSpace(input), 10, 64)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	if cmdLine.Version {
-		cmdLine.PrintVersion()
-		os.Exit(0)
-	}
+	return n
 }
